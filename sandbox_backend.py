@@ -107,8 +107,6 @@ class AIOSandboxBackend(BaseSandbox):
         output = getattr(result.data, "output", "") or ""
         exit_code = getattr(result.data, "exit_code", 0) or 0
 
-        print("AIOSandboxBackend context: " + str(self.client.sandbox.get_context()))
-
         return ExecuteResponse(output=output, exit_code=exit_code)
 
     # --- File operations: file API ---

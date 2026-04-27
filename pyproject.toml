@@ -8,8 +8,10 @@ dependencies = [
     "agent-sandbox>=0.0.30",
     "deepagents>=0.5.2",
     "langchain>=1.2.15",
+    "langchain-deepseek>=1.0.1",
     "langchain-openai>=1.1.12",
     "langgraph>=1.1.6",
     "python-dotenv>=1.2.2",
+    "rich>=15.0.0",
     "tavily-python>=0.7.23",
 ]
