@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "skills": {
+    "SQLite Database Expert": {
+      "source": "martinholovsky/claude-skills-generator",
+      "sourceType": "github",
+      "computedHash": "515e1971f145631025485c6dbf83c62bb7ee0fabc805d0e2bd07ac2aac7f24d8"
+    },
+    "fastapi-python": {
+      "source": "mindrally/skills",
+      "sourceType": "github",
+      "computedHash": "4521c6090735152b7b8df670cefe5c1c6d1dcaa115de67bb96e74ebf802d4f24"
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "computedHash": "516bd2154eb843a8240e43d5b285229129853114ad7075a5e141e1c08e408c84"
+    }
+  }
+}
