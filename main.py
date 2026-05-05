@@ -1,9 +1,11 @@
 import asyncio
+import json
 import logging
 import os
 import sys
 from datetime import datetime
 from io import StringIO
+from pathlib import Path
 from uuid import uuid4
 
 from agent_sandbox import Sandbox
@@ -11,6 +13,7 @@ from deepagents import create_deep_agent
 from langchain.agents.middleware import TodoListMiddleware
 from langchain.chat_models.base import init_chat_model
 from langchain_openai import ChatOpenAI
+from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from sandbox_backend import AIOSandboxBackend
 
@@ -192,6 +195,32 @@ sqlite_subagent = {
 }
 
 
+MCP_CONFIG_PATH = os.getenv("MCP_CONFIG", "mcp_config.json")
+
+
+async def load_mcp_tools_for_agent(
+    config_path: str, agent_name: str
+) -> tuple[MultiServerMCPClient | None, list]:
+    """Load MCP tools for a specific agent from config.
+
+    Returns (client, tools_list). client is kept alive to maintain tool sessions.
+    """
+    config_file = Path(config_path)
+    if not config_file.exists():
+        return None, []
+
+    with open(config_file) as f:
+        config = json.load(f)
+
+    agent_servers = config.get(agent_name, {})
+    if not agent_servers:
+        return None, []
+
+    client = MultiServerMCPClient(agent_servers)
+    tools = await client.get_tools()
+    return client, tools
+
+
 async def main():
     print(f"工作区目录: {WORKSPACE_DIR}")
     logging.basicConfig(
@@ -204,6 +233,32 @@ async def main():
     )
     logger = logging.getLogger(__name__)
 
+    # --- 加载 MCP 工具 ---
+    print("加载 MCP 工具...")
+    main_mcp_client, main_mcp_tools = await load_mcp_tools_for_agent(
+        MCP_CONFIG_PATH, "main"
+    )
+    frontend_mcp_client, frontend_mcp_tools = await load_mcp_tools_for_agent(
+        MCP_CONFIG_PATH, "frontend-agent"
+    )
+    backend_mcp_client, backend_mcp_tools = await load_mcp_tools_for_agent(
+        MCP_CONFIG_PATH, "backend-agent"
+    )
+    sqlite_mcp_client, sqlite_mcp_tools = await load_mcp_tools_for_agent(
+        MCP_CONFIG_PATH, "sqlite-agent"
+    )
+
+    if main_mcp_tools:
+        print(f"  主 agent: {len(main_mcp_tools)} 个 MCP 工具")
+    for name, tools in [
+        ("frontend-agent", frontend_mcp_tools),
+        ("backend-agent", backend_mcp_tools),
+        ("sqlite-agent", sqlite_mcp_tools),
+    ]:
+        if tools:
+            print(f"  {name}: {len(tools)} 个 MCP 工具")
+
+    # --- 沙箱后端 ---
     sandbox_url = os.getenv("SANDBOX_URL", "http://localhost:18080")
     client = Sandbox(base_url=sandbox_url)
 
@@ -220,7 +275,21 @@ async def main():
             system_prompt=SYSTEM_PROMPT,
             model=model,
             backend=backend,
-            subagents=[frontend_subagent, backend_subagent, sqlite_subagent],
+            tools=main_mcp_tools or None,
+            subagents=[
+                {
+                    **frontend_subagent,
+                    "tools": (frontend_subagent["tools"] or []) + (frontend_mcp_tools or []),
+                },
+                {
+                    **backend_subagent,
+                    "tools": (backend_subagent["tools"] or []) + (backend_mcp_tools or []),
+                },
+                {
+                    **sqlite_subagent,
+                    "tools": (sqlite_subagent["tools"] or []) + (sqlite_mcp_tools or []),
+                },
+            ],
         )
 
         # 初始化消息历史
